@@ -30,6 +30,7 @@ func main() {
 		jdSecKill.StartTime = jdSecKill.StartTime.AddDate(0, 0, 1)
 	}
 	logs.PrintlnInfo("开始执行时间为：", jdSecKill.StartTime.Format(global.DateTimeFormatStr))
+
 	err = jdSecKill.Run()
 	if err != nil {
 		if strings.Contains(err.Error(), "exec") {
