@@ -1,4 +1,4 @@
-# Jd_Seckill
+# mtSecKill
 
 ## 特别声明:
 
