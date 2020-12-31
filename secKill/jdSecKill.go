@@ -210,19 +210,11 @@ func (jsk *jdSecKill) Run() error {
 				go func() {
 					logs.PrintlnInfo("创建线程：", i)
 					//提取抢购连接
-					FetchSecKillUrlRE:
 					jsk.FetchSecKillUrl()
 
-					//请求抢购连接
-					err := jsk.ReqSecKillUrl()
-					if err != nil {//失败重试
-						logs.PrintlnInfo(err, "等待重试")
-						goto FetchSecKillUrlRE
-					}
-
 					SecKillRE:
-						//提交订单
-					err = jsk.ReqSubmitSecKillOrder()
+					//请求抢购连接，提交订单
+					err := jsk.ReqSubmitSecKillOrder()
 					if err != nil {
 						logs.PrintlnInfo(err, "等待重试")
 						goto SecKillRE
@@ -346,25 +338,17 @@ func (jsk *jdSecKill) FetchSecKillUrl() {
 	return
 }
 
-func (jsk *jdSecKill) ReqSecKillUrl() error {
-	logs.PrintlnInfo("正在访问抢购连接......")
-	_, err := jsk.GetReq(jsk.SecKillUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html")
-	if err != nil {
-		logs.PrintErr("访问抢购连接失败：", err)
-		return err
-	}
-	return nil
-}
-
 
 func (jsk *jdSecKill) ReqSubmitSecKillOrder() error {
-
-	logs.PrintlnInfo("访问抢购订单结算页面......")
-
 	jsk.mu.Lock()
+
 	//这里直接使用浏览器跳转 主要目的是获取cookie
 	//个人推测这一步跳转应该是为了获取cookie 在多线程情况下 这里不加锁可能会导致cookie被覆盖
 	//所以这里添加一个锁 在获取订单参数成功后释放
+	logs.PrintlnInfo("正在访问抢购连接......")
+	_, _, _, _  = page.Navigate(jsk.SecKillUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(jsk.bCtx)
+
+	logs.PrintlnInfo("访问抢购订单结算页面......")
 	_, _, _, _ = page.Navigate(fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())).
 		WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(jsk.bCtx)
 
