@@ -259,6 +259,7 @@ func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
 
 func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 	return func(ctx context.Context) error {
+		RE:
 		logs.PrintlnInfo("正在获取eid和fp参数....")
 		_ = chromedp.Navigate("https://search.jd.com/Search?keyword=情趣内衣").Do(ctx)
 		logs.PrintlnInfo("等待页面更新完成....")
@@ -269,10 +270,12 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 			return err
 		}
 		n := itemNodes[rand.Intn(len(itemNodes))]
+		_ = dom.ScrollIntoViewIfNeeded().WithNodeID(n.NodeID).Do(ctx)
 		_, _, _, _ = page.Navigate("https://item.jd.com/"+n.AttributeValue("data-sku")+".html").Do(ctx)
 
 		logs.PrintlnInfo("等待商品详情页更新完成....")
 		_ = chromedp.WaitVisible("#InitCartUrl").Do(ctx)
+		_ = chromedp.Sleep(1 * time.Second).Do(ctx);
 		_ = chromedp.Click("#InitCartUrl").Do(ctx)
 		_ = chromedp.WaitVisible("#GotoShoppingCart").Do(ctx)
 		_ = chromedp.Sleep(1 * time.Second).Do(ctx);
@@ -286,7 +289,6 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 		logs.PrintlnInfo("等待结算页加载完成..... 如遇到未选中商品错误，可手动选中后点击结算")
 		<-ch
 		//执行js参数 将eid和fp显示到对应元素上
-		RE:
 		_ = chromedp.Sleep(3 * time.Second).Do(ctx)
 		var res []string
 		js := `
@@ -320,7 +322,6 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 			_ = dom.RemoveNode(eidNodes[0].NodeID).Do(ctx)
 			_ = dom.RemoveNode(fpNodes[0].NodeID).Do(ctx)
 			logs.PrintlnWarning("获取参数失败，等待重试。。。 重试过程过久可手动刷新浏览器")
-			_ = page.Reload().Do(ctx)
 			goto RE
 		}
 		logs.PrintlnInfo("参数获取成功：eid【"+jsk.eid+"】, fp【"+jsk.fp+"】")
