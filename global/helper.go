@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+func UnixMilli() int64 {
+	return time.Now().UnixNano() / 1e6
+}
+
 func GenerateRangeNum(min, max int64) int64 {
 	rand.Seed(time.Now().UnixNano())
 	randNum := rand.Int63n(max - min) + min
