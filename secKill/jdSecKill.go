@@ -15,6 +15,7 @@ import (
 	"github.com/zqijzqj/mtSecKill/global"
 	"github.com/zqijzqj/mtSecKill/logs"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -180,10 +181,6 @@ func (jsk *jdSecKill) InitActionFunc() chromedp.ActionFunc {
 						}
 						jsk.isLogin = true
 					}
-					if e.Response.URL == "https://www.baidu.com/" {
-						logs.PrintlnInfo("baidu请求头：")
-						logs.PrintlnInfo(e.Response.RequestHeadersText)
-					}
 				}()
 
 			}
@@ -263,7 +260,7 @@ func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
 func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 	return func(ctx context.Context) error {
 		logs.PrintlnInfo("正在获取eid和fp参数....")
-		_ = chromedp.Navigate("https://search.jd.com/Search?keyword=%E4%B9%8C%E6%B1%9F%E6%A6%A8%E8%8F%9C").Do(ctx)
+		_ = chromedp.Navigate("https://search.jd.com/Search?keyword=情趣内衣").Do(ctx)
 		logs.PrintlnInfo("等待页面更新完成....")
 		_ = chromedp.WaitVisible(".gl-item").Do(ctx)
 		var itemNodes []*cdp.Node
@@ -271,10 +268,8 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 		if err != nil {
 			return err
 		}
-		for _, v := range itemNodes {
-			_ = chromedp.Navigate("https://item.jd.com/"+v.AttributeValue("data-sku")+".html").Do(ctx)
-			break
-		}
+		n := itemNodes[rand.Intn(len(itemNodes))]
+		_, _, _, _ = page.Navigate("https://item.jd.com/"+n.AttributeValue("data-sku")+".html").Do(ctx)
 
 		logs.PrintlnInfo("等待商品详情页更新完成....")
 		_ = chromedp.WaitVisible("#InitCartUrl").Do(ctx)
@@ -325,6 +320,7 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 			_ = dom.RemoveNode(eidNodes[0].NodeID).Do(ctx)
 			_ = dom.RemoveNode(fpNodes[0].NodeID).Do(ctx)
 			logs.PrintlnWarning("获取参数失败，等待重试。。。 重试过程过久可手动刷新浏览器")
+			_ = page.Reload().Do(ctx)
 			goto RE
 		}
 		logs.PrintlnInfo("参数获取成功：eid【"+jsk.eid+"】, fp【"+jsk.fp+"】")
