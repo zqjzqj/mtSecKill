@@ -37,3 +37,7 @@
   
 ## 运行参数
  - mtSecKill -sku=100012043978 -num=2 -works=6 -time=09:59:59 运行参数 均有默认可以不加
+
+## 打赏
+要是客官抢到了茅台，心情好，请我喝一杯咖啡好不好:)  
+![收款二维码](https://github.com/huanghyw/jd_seckill/blob/master/resource/payment_code.png)
