@@ -40,4 +40,4 @@
 
 ## 打赏
 要是客官抢到了茅台，心情好，请我喝一杯咖啡好不好:)  
-![收款二维码](https://github.com/huanghyw/jd_seckill/blob/master/resource/payment_code.png)
+![收款二维码](https://github.com/zqjzqj/mtSecKill/blob/master/zqijun.jpg)
