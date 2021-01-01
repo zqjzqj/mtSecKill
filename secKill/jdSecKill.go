@@ -424,8 +424,8 @@ func (jsk *jdSecKill) GetOrderReqData() url.Values {
 		"phone":[]string{""},
 		"eid":[]string{jsk.eid},
 		"fp":[]string{jsk.fp},
-		"token":[]string{""},
-		"pru":[]string{jsk.SecKillInfo.Get("token").String()},
+		"token":[]string{jsk.SecKillInfo.Get("token").String()},
+		"pru":[]string{""},
 
 	}
 
