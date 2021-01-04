@@ -285,7 +285,12 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 		err = chromedp.Evaluate("_JdTdudfp", &res).Do(ctx)
 		logs.PrintErr(err)
 		logs.Println("_JdTdudfp: ", res)
-		jsk.eid = res["eid"].(string)
+		eid, ok := res["eid"]
+		if !ok {
+			logs.PrintlnInfo("获取eid失败,正在重试")
+			goto RE
+		}
+		jsk.eid = eid.(string)
 		jsk.fp = res["fp"].(string)
 
 		if jsk.fp == "" || jsk.eid == "" || jsk.fp == "undefined" || jsk.eid == "undefined" {
