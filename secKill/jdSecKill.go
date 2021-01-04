@@ -281,37 +281,14 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 		<-ch
 		//执行js参数 将eid和fp显示到对应元素上
 		_ = chromedp.Sleep(3 * time.Second).Do(ctx)
-		var res []string
-		js := `
-			input = document.createElement("input");
-			input.type = "hidden";
-			input.id = "eid";
-			input.name = "eid";
-			input.value = _JdTdudfp.eid;
-			document.getElementById("mainframe").appendChild(input);
+		res := make(map[string]interface{})
+		err = chromedp.Evaluate("_JdTdudfp", &res).Do(ctx)
+		logs.PrintErr(err)
+		logs.Println("_JdTdudfp: ", res)
+		jsk.eid = res["eid"].(string)
+		jsk.fp = res["fp"].(string)
 
-			input = document.createElement("input");
-			input.type = "hidden";
-			input.id = "fp";
-			input.name = "fp";
-			input.value = _JdTdudfp.fp;
-			document.getElementById("mainframe").appendChild(input);
-		`
-		_ = chromedp.Evaluate(js, &res).Do(ctx)
-
-		var eidNodes []*cdp.Node
-		var fpNodes []*cdp.Node
-		_ = chromedp.Nodes("#eid", &eidNodes).Do(ctx)
-		if len(eidNodes) == 0 {
-			goto RE
-		}
-		jsk.eid = eidNodes[0].AttributeValue("value")
-
-		_ = chromedp.Nodes("#fp", &fpNodes).Do(ctx)
-		jsk.fp = fpNodes[0].AttributeValue("value")
 		if jsk.fp == "" || jsk.eid == "" || jsk.fp == "undefined" || jsk.eid == "undefined" {
-			_ = dom.RemoveNode(eidNodes[0].NodeID).Do(ctx)
-			_ = dom.RemoveNode(fpNodes[0].NodeID).Do(ctx)
 			logs.PrintlnWarning("获取参数失败，等待重试。。。 重试过程过久可手动刷新浏览器")
 			goto RE
 		}
