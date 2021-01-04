@@ -188,6 +188,14 @@ func NewExecCtx(opts ...chromedp.ExecAllocatorOption) (context.Context, context.
 	return ctx, cancel
 }
 
+func NewExecRemoteCtx(remoteWs string, opts ...chromedp.ExecAllocatorOption) (context.Context, context.CancelFunc) {
+	topC, _ := context.WithCancel(GetGlobalCtx())
+	c, _ := chromedp.NewExecAllocator(topC, CreateOptions(opts...)...)
+	c, _ = chromedp.NewRemoteAllocator(c, remoteWs)
+	ctx, cancel := chromedp.NewContext(c)
+	return ctx, cancel
+}
+
 func NewExecAllocator(tasks chromedp.Tasks, opts ...chromedp.ExecAllocatorOption) error {
 	//超时设置
 	topC, topCC := context.WithCancel(GetGlobalCtx())
