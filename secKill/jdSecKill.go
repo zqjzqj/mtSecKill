@@ -98,7 +98,7 @@ func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer st
 	}
 	defer resp.Body.Close()
 	b, _ := ioutil.ReadAll(resp.Body)
-	logs.PrintlnSuccess("请求接口:", req.URL)
+	logs.PrintlnSuccess("Get请求接口:", req.URL)
 //	logs.PrintlnSuccess(string(b))
 	logs.PrintlnInfo("=======================")
 	r := FormatJdResponse(b, req.URL.String(), true)
@@ -119,12 +119,11 @@ func (jsk *jdSecKill) SyncJdTime() {
 }
 
 func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string) (gjson.Result, error) {
-	if referer == "" {
-		referer = "https://www.jd.com"
-	}
 	req, _ := http.NewRequest("GET", reqUrl, strings.NewReader(params.Encode()))
 	req.Header.Add("User-Agent", jsk.userAgent)
-	req.Header.Add("Referer", referer)
+	if referer != "" {
+		req.Header.Add("Referer", referer)
+	}
 	req.Header.Add("Host", req.URL.Host)
 	resp, err := chromedpEngine.RequestByCookie(jsk.bCtx, req)
 	if err != nil {
@@ -133,7 +132,7 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string) 
 	defer resp.Body.Close()
 	b, _ := ioutil.ReadAll(resp.Body)
 
-	logs.PrintlnSuccess("请求连接", req.URL)
+	logs.PrintlnSuccess("Post请求连接", req.URL)
 	logs.PrintlnInfo("=======================")
 	r := FormatJdResponse(b, req.URL.String(), true)
 	if r.Raw == "null" || r.Raw == "" {
@@ -243,6 +242,7 @@ func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
 				logs.PrintlnInfo("时间到达。。。。开始执行")
 				break
 			}
+			logs.Println("时差：", global.UnixMilli() - jsk.DiffTime, "ms")
 			time.Sleep(200 * time.Millisecond)
 		}
 		return nil
@@ -338,7 +338,6 @@ func (jsk *jdSecKill) FetchSecKillUrl() {
 	return
 }
 
-
 func (jsk *jdSecKill) ReqSubmitSecKillOrder() error {
 	jsk.mu.Lock()
 
@@ -348,18 +347,18 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder() error {
 	logs.PrintlnInfo("正在访问抢购连接......")
 	_, _, _, _  = page.Navigate(jsk.SecKillUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(jsk.bCtx)
 
-	logs.PrintlnInfo("访问抢购订单结算页面......")
-	_, _, _, _ = page.Navigate(fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())).
-		WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(jsk.bCtx)
+	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
+	logs.PrintlnInfo("访问抢购订单结算页面......", skUrl)
+	_, _, _, _ = page.Navigate(skUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(jsk.bCtx)
 
 	logs.PrintlnInfo("提交抢购订单")
-	referer := "https://marathon.jd.com/seckill/seckill.action?skuId="+jsk.SkuId+"&num="+strconv.Itoa(jsk.SecKillNum)+"&rid="+strconv.FormatInt(time.Now().Unix(), 10)
 	orderData := jsk.GetOrderReqData()
 	jsk.mu.Unlock()
 
 	if len(orderData) == 0 {
 		return errors.New("订单参数生成失败")
 	}
+	referer := "https://marathon.jd.com/seckill/seckill.action?skuId="+jsk.SkuId+"&num="+strconv.Itoa(jsk.SecKillNum)+"&rid="+strconv.FormatInt(time.Now().Unix(), 10)
 	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, referer)
 	if err != nil {
 		logs.PrintErr("抢购失败：", err)
