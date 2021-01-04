@@ -206,12 +206,11 @@ func (jsk *jdSecKill) Run() error {
 		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			for i := 1; i <= jsk.Works; i++ {
+				logs.PrintlnInfo("创建线程：", i)
 				go func() {
-					logs.PrintlnInfo("创建线程：", i)
+					SecKillRE:
 					//提取抢购连接
 					jsk.FetchSecKillUrl()
-
-					SecKillRE:
 					//请求抢购连接，提交订单
 					err := jsk.ReqSubmitSecKillOrder()
 					if err != nil {
