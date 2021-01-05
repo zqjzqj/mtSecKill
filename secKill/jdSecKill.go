@@ -119,7 +119,7 @@ func (jsk *jdSecKill) SyncJdTime() {
 }
 
 func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string) (gjson.Result, error) {
-	req, _ := http.NewRequest("GET", reqUrl, strings.NewReader(params.Encode()))
+	req, _ := http.NewRequest("POST", reqUrl, strings.NewReader(params.Encode()))
 	req.Header.Add("User-Agent", jsk.userAgent)
 	if referer != "" {
 		req.Header.Add("Referer", referer)
