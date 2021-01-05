@@ -139,7 +139,25 @@ func RequestByCookie(ctx context.Context, req *http.Request) (*http.Response, er
 		}
 		req.AddCookie(c2)
 	}
-	return httpClient.Do(req)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	respCookies := resp.Cookies()
+	bCookies := make([]*network.CookieParam, 0, len(respCookies))
+	for _, respCookie := range respCookies {
+		bCookies = append(bCookies, &network.CookieParam{
+			Name:     respCookie.Name,
+			Value:    respCookie.Value,
+			URL:      req.URL.String(),
+			Domain:   respCookie.Domain,
+			Path:     respCookie.Path,
+			Secure:   respCookie.Secure,
+			HTTPOnly: respCookie.HttpOnly,
+		})
+	}
+	_ = network.SetCookies(bCookies).Do(ctx)
+	return resp, err
 }
 
 
