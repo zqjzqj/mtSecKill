@@ -366,7 +366,6 @@ func (jsk *jdSecKill) GetOrderReqData() url.Values {
 		err := jsk.GetSecKillInitInfo()
 		if err != nil {
 			logs.PrintErr("抢购失败：", err)
-			time.Sleep(1*time.Second)
 		}
 		break
 	}
