@@ -213,9 +213,9 @@ func (jsk *jdSecKill) Run() error {
 		jsk.GetEidAndFp(),
 		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
+			//提取抢购连接
+			jsk.FetchSecKillUrl()
 			for _, v := range jsk.bWorksCtx {
-				//提取抢购连接
-				jsk.FetchSecKillUrl()
 				go func(ctx2 context.Context) {
 					SecKillRE:
 					//请求抢购连接，提交订单
