@@ -27,7 +27,7 @@ func main() {
 	}
 
 	if jdSecKill.StartTime.Unix() < time.Now().Unix() {
-		jdSecKill.StartTime = jdSecKill.StartTime.AddDate(0, 0, 1)
+//		jdSecKill.StartTime = jdSecKill.StartTime.AddDate(0, 0, 1)
 	}
 	jdSecKill.SyncJdTime()
 	logs.PrintlnInfo("开始执行时间为：", jdSecKill.StartTime.Format(global.DateTimeFormatStr))
