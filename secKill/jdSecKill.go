@@ -365,8 +365,7 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	}
 
 	logs.PrintlnInfo("提交抢购订单.............")
-	referer := "https://marathon.jd.com/seckill/seckill.action?skuId="+jsk.SkuId+"&num="+strconv.Itoa(jsk.SecKillNum)+"&rid="+strconv.FormatInt(time.Now().Unix(), 10)
-	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, referer, ctx)
+	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, skUrl, ctx)
 	if err != nil {
 		logs.PrintErr("抢购失败：", err)
 	}
