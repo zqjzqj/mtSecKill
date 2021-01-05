@@ -241,7 +241,7 @@ func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
 				logs.PrintlnInfo("时间到达。。。。开始执行")
 				break
 			}
-			logs.Println("时差：", global.UnixMilli() - jsk.DiffTime, "ms")
+			logs.Println("时差：", st - global.UnixMilli(), "ms")
 			time.Sleep(200 * time.Millisecond)
 		}
 		return nil
@@ -252,7 +252,7 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 	return func(ctx context.Context) error {
 		RE:
 		logs.PrintlnInfo("正在获取eid和fp参数....")
-		_ = chromedp.Navigate("https://search.jd.com/Search?keyword=情趣内衣").Do(ctx)
+		_ = chromedp.Navigate("https://search.jd.com/Search?keyword=乌江榨菜").Do(ctx)
 		logs.PrintlnInfo("等待页面更新完成....")
 		_ = chromedp.WaitVisible(".gl-item").Do(ctx)
 		var itemNodes []*cdp.Node
