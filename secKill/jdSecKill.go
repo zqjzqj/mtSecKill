@@ -344,8 +344,6 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 		ctx = jsk.bCtx
 	}
 	//这里直接使用浏览器跳转 主要目的是获取cookie
-	//个人推测这一步跳转应该是为了获取cookie 在多线程情况下 这里不加锁可能会导致cookie被覆盖
-	//所以这里添加一个锁 在获取订单参数成功后释放
 	logs.PrintlnInfo("正在访问抢购连接......")
 	_, _, _, _  = page.Navigate(jsk.SecKillUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx)
 	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
