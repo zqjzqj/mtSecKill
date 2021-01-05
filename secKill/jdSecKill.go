@@ -320,7 +320,7 @@ func (jsk *jdSecKill) FetchSecKillUrl() {
 }
 
 func (jsk *jdSecKill) ReqSubmitSecKillOrder() error {
-	//jsk.mu.Lock()
+	jsk.mu.Lock()
 
 	//这里直接使用浏览器跳转 主要目的是获取cookie
 	//个人推测这一步跳转应该是为了获取cookie 在多线程情况下 这里不加锁可能会导致cookie被覆盖
@@ -334,7 +334,7 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder() error {
 
 	logs.PrintlnInfo("提交抢购订单")
 	orderData := jsk.GetOrderReqData()
-//	jsk.mu.Unlock()
+	jsk.mu.Unlock()
 
 	if len(orderData) == 0 {
 		return errors.New("订单参数生成失败")
