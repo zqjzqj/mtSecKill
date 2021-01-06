@@ -128,8 +128,6 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, 
 		ctx = jsk.bCtx
 	}
 	req, _ := http.NewRequest("POST", reqUrl, strings.NewReader(params.Encode()))
-
-	logs.PrintlnInfo("=============", req.Form, req.Form.Encode())
 	req.Header.Add("User-Agent", jsk.userAgent)
 	if referer != "" {
 		req.Header.Add("Referer", referer)
@@ -145,6 +143,7 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, 
 
 	logs.PrintlnSuccess("Post请求连接", req.URL)
 	logs.PrintlnInfo("=======================")
+	logs.PrintlnInfo("resp body:", string(b))
 	r := FormatJdResponse(b, req.URL.String(), false)
 	if r.Raw == "null" || r.Raw == "" {
 		return gjson.Result{}, errors.New("获取数据失败：" + r.Raw)
@@ -366,7 +365,7 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	if len(orderData) == 0 {
 		return errors.New("订单参数生成失败")
 	}
-
+	logs.PrintlnInfo("订单参数：", orderData.Encode())
 	logs.PrintlnInfo("提交抢购订单.............")
 	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, skUrl, ctx)
 	if err != nil {
