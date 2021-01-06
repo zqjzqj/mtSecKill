@@ -8,7 +8,6 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
-	"github.com/zqijzqj/mtSecKill/global"
 	"github.com/zqijzqj/mtSecKill/logs"
 	"math/rand"
 	"net/http"
@@ -121,23 +120,15 @@ func AddDefaultOptions(option ...chromedp.ExecAllocatorOption) {
 
 func RequestByCookie(ctx context.Context, req *http.Request) (*http.Response, error) {
 	httpClient := &http.Client{}
-	cookies, err := network.GetAllCookies().Do(ctx)
+	cookies, err := network.GetCookies().WithUrls([]string{req.URL.String()}).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for _, c := range cookies {
-		ct := time.Unix(int64(c.Expires), 0)
-		c2 := &http.Cookie{
+		req.AddCookie(&http.Cookie{
 			Name:       c.Name,
 			Value:      c.Value,
-			Path:       c.Path,
-			Domain:     c.Domain,
-			Expires:    ct,
-			RawExpires: ct.Format(global.DateTimeFormatStr),
-			Secure:     c.Secure,
-			HttpOnly:   c.HTTPOnly,
-		}
-		req.AddCookie(c2)
+		})
 	}
 	return httpClient.Do(req)
 }
