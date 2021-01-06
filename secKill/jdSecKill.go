@@ -106,7 +106,7 @@ func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer st
 	logs.PrintlnSuccess("Get请求接口:", req.URL)
 //	logs.PrintlnSuccess(string(b))
 	logs.PrintlnInfo("=======================")
-	r := FormatJdResponse(b, req.URL.String(), true)
+	r := FormatJdResponse(b, req.URL.String(), false)
 	if r.Raw == "null" || r.Raw == "" {
 		return gjson.Result{}, errors.New("获取数据失败：" + r.Raw)
 	}
@@ -128,10 +128,13 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, 
 		ctx = jsk.bCtx
 	}
 	req, _ := http.NewRequest("POST", reqUrl, strings.NewReader(params.Encode()))
+
+	logs.PrintlnInfo("=============", req.Form, req.Form.Encode())
 	req.Header.Add("User-Agent", jsk.userAgent)
 	if referer != "" {
 		req.Header.Add("Referer", referer)
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Host", req.URL.Host)
 	resp, err := chromedpEngine.RequestByCookie(ctx, req)
 	if err != nil {
@@ -142,7 +145,7 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, 
 
 	logs.PrintlnSuccess("Post请求连接", req.URL)
 	logs.PrintlnInfo("=======================")
-	r := FormatJdResponse(b, req.URL.String(), true)
+	r := FormatJdResponse(b, req.URL.String(), false)
 	if r.Raw == "null" || r.Raw == "" {
 		return gjson.Result{}, errors.New("获取数据失败：" + r.Raw)
 	}
@@ -387,7 +390,19 @@ func (jsk *jdSecKill) GetOrderReqData() url.Values {
 			logs.PrintErr("订单参数错误：", f)
 		}
 	}()
-	defaultAddress := jsk.SecKillInfo.Get("addressList").Array()[0]
+
+	addressList := jsk.SecKillInfo.Get("addressList").Array()
+	var defaultAddress gjson.Result
+	for _, dAddress := range addressList {
+		if dAddress.Get("defaultAddress").Bool() {
+			logs.PrintlnInfo("获取到默认收货地址")
+			defaultAddress = dAddress
+		}
+	}
+	if defaultAddress.Raw == "" {
+		logs.PrintlnInfo("没有获取到默认收货地址， 自动选择一个地址")
+		defaultAddress = addressList[0]
+	}
 	invoiceInfo := jsk.SecKillInfo.Get("invoiceInfo")
 	r := url.Values{
 		"skuId":[]string{jsk.SkuId},
@@ -448,7 +463,7 @@ func (jsk *jdSecKill) GetSecKillInitInfo(ctx context.Context) error {
 		"sku":[]string{jsk.SkuId},
 		"num":[]string{strconv.Itoa(jsk.SecKillNum)},
 		"isModifyAddress":[]string{"false"},
-	}, "", ctx)
+	}, fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=100012043978&num=2&rid=%d6", time.Now().Unix()), ctx)
 	if err != nil {
 		return err
 	}
