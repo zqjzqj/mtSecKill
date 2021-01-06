@@ -165,12 +165,15 @@ func FormatJdResponse(b []byte, prefix string, isConvertStr bool) gjson.Result {
 				prefix = pUrl.Query().Get("callback")
 			}
 		}
+		logs.PrintlnInfo("prefix:", prefix)
 		r = strings.TrimPrefix(r, prefix)
 	}
-	if strings.HasSuffix(r, ")") {
+	if strings.HasSuffix(r, ")") || strings.HasPrefix(r, "(") {
+		r = strings.TrimRight(r, ";")
 		r = strings.TrimLeft(r, `(`)
 		r = strings.TrimRight(r, ")")
 	}
+	logs.PrintlnInfo(r)
 	return gjson.Parse(r)
 }
 

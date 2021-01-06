@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"github.com/zqijzqj/mtSecKill/global"
 	"github.com/zqijzqj/mtSecKill/logs"
 	"github.com/zqijzqj/mtSecKill/secKill"
@@ -11,12 +12,42 @@ import (
 	"time"
 )
 
-var skuId = flag.String("sku", "100012043978", "茅台商品ID")
+var skuId = flag.String("sku", "", "茅台商品ID")
 var num = flag.Int("num", 2, "茅台商品ID")
 var works = flag.Int("works", 7, "并发数")
-var start = flag.String("time", "09:59:59", "开始时间---不带日期")
+var start = flag.String("time", "", "开始时间---不带日期")
+var sType = flag.Int("sType", 0, "秒杀类型")
 
 func main() {
+	if *sType == 0 {
+		logs.PrintlnInfo("请输入运行类型：1京东，2天猫")
+		_, err := fmt.Scan(sType)
+		if err != nil {
+			logs.Fatal("参数接收错误：", err)
+		}
+	}
+
+	if *sType == 1 {
+		if *skuId == "" {
+			*skuId = "100012043978"
+		}
+		if *start == "" {
+			*start = "09:59:58"
+		}
+		jd()
+	} else {
+		if *skuId == "" {
+			*skuId = "20739895092"
+		}
+		if *start == "" {
+			*start = "19:59:58"
+		}
+		logs.PrintlnInfo(*skuId)
+		tm()
+	}
+}
+
+func jd() {
 	var err error
 	execPath := ""
 	RE:
@@ -33,6 +64,34 @@ func main() {
 	logs.PrintlnInfo("开始执行时间为：", jdSecKill.StartTime.Format(global.DateTimeFormatStr))
 
 	err = jdSecKill.Run()
+	if err != nil {
+		if strings.Contains(err.Error(), "exec") {
+			logs.PrintlnInfo("默认浏览器执行路径未找到，"+execPath+"  请重新输入：")
+			scanner := bufio.NewScanner(os.Stdin)
+			for scanner.Scan() {
+				execPath = scanner.Text()
+				if execPath != "" {
+					break
+				}
+			}
+			goto RE
+		}
+		logs.Fatal(err)
+	}
+}
+
+func tm() {
+	var err error
+	execPath := ""
+	RE:
+	tmSecKill := secKill.NewTmSecKill(execPath, *skuId, *num, *works)
+	tmSecKill.StartTime, err = global.Hour2Unix(*start)
+	if tmSecKill.StartTime.Unix() < time.Now().Unix() {
+		tmSecKill.StartTime = tmSecKill.StartTime.AddDate(0, 0, 1)
+	}
+	logs.PrintlnInfo("开始执行时间为：", tmSecKill.StartTime.Format(global.DateTimeFormatStr))
+
+	err = tmSecKill.Run()
 	if err != nil {
 		if strings.Contains(err.Error(), "exec") {
 			logs.PrintlnInfo("默认浏览器执行路径未找到，"+execPath+"  请重新输入：")
