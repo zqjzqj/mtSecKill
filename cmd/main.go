@@ -13,7 +13,7 @@ import (
 
 var skuId = flag.String("sku", "100012043978", "茅台商品ID")
 var num = flag.Int("num", 2, "茅台商品ID")
-var works = flag.Int("works", 12, "并发数")
+var works = flag.Int("works", 7, "并发数")
 var start = flag.String("time", "09:59:59", "开始时间---不带日期")
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 	}
 
 	if jdSecKill.StartTime.Unix() < time.Now().Unix() {
-//		jdSecKill.StartTime = jdSecKill.StartTime.AddDate(0, 0, 1)
+		jdSecKill.StartTime = jdSecKill.StartTime.AddDate(0, 0, 1)
 	}
 	jdSecKill.SyncJdTime()
 	logs.PrintlnInfo("开始执行时间为：", jdSecKill.StartTime.Format(global.DateTimeFormatStr))
