@@ -244,18 +244,21 @@ func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
 	return func(ctx context.Context) error {
 		u := "https://item.jd.com/"+jsk.SkuId+".html"
 		for i := 0; i < jsk.Works; i++ {
-			tid, err := target.CreateTarget(u).Do(ctx)
-			if err == nil {
-				c, _ := chromedp.NewContext(jsk.bCtx, chromedp.WithTargetID(tid))
-				_ = chromedp.Run(c, chromedp.Tasks{
-					chromedp.ActionFunc(func(ctx context.Context) error {
-						jsk.mu.Lock()
-						jsk.bWorksCtx = append(jsk.bWorksCtx, ctx)
-						jsk.mu.Unlock()
-						return nil
-					}),
-				})
-			}
+			go func() {
+				tid, err := target.CreateTarget(u).Do(ctx)
+				if err == nil {
+					c, _ := chromedp.NewContext(jsk.bCtx, chromedp.WithTargetID(tid))
+					_ = chromedp.Run(c, chromedp.Tasks{
+						chromedp.ActionFunc(func(ctx context.Context) error {
+							logs.PrintlnInfo("打开新的抢购标签.....")
+							jsk.mu.Lock()
+							jsk.bWorksCtx = append(jsk.bWorksCtx, ctx)
+							jsk.mu.Unlock()
+							return nil
+						}),
+					})
+				}
+			}()
 		}
 		_ = chromedp.Navigate(u).Do(ctx)
 		st := jsk.StartTime.UnixNano() / 1e6
