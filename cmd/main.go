@@ -16,6 +16,10 @@ var num = flag.Int("num", 2, "茅台商品ID")
 var works = flag.Int("works", 7, "并发数")
 var start = flag.String("time", "09:59:59", "开始时间---不带日期")
 
+func init() {
+	flag.Parse()
+}
+
 func main() {
 	var err error
 	execPath := ""

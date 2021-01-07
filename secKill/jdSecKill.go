@@ -216,9 +216,9 @@ func (jsk *jdSecKill) Run() error {
 		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			//提取抢购连接
-			jsk.FetchSecKillUrl()
 			for _, v := range jsk.bWorksCtx {
 				go func(ctx2 context.Context) {
+					jsk.FetchSecKillUrl()
 					SecKillRE:
 					//请求抢购连接，提交订单
 					err := jsk.ReqSubmitSecKillOrder(ctx2)
@@ -328,10 +328,10 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 func (jsk *jdSecKill) FetchSecKillUrl() {
 	logs.PrintlnInfo("开始获取抢购连接.....")
 	for {
-		jsk.SecKillUrl = jsk.GetSecKillUrl()
 		if jsk.SecKillUrl != "" {
 			break
 		}
+		jsk.SecKillUrl = jsk.GetSecKillUrl()
 		logs.PrintlnWarning("抢购链接获取失败.....正在重试")
 	}
 	jsk.SecKillUrl = "https:" + strings.TrimPrefix(jsk.SecKillUrl, "https:")
