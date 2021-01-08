@@ -379,7 +379,10 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 		jsk.IsOkChan <- struct{}{}
 		logs.PrintlnInfo("抢购成功，订单编号:", r.Get("orderId").String())
 	} else {
-		return errors.New("抢购失败：" + r.Raw)
+		if r.IsObject() || r.IsArray() {
+			return errors.New("抢购失败：" + r.Raw)
+		}
+		return errors.New("抢购失败,再接再厉")
 	}
 	return nil
 }
