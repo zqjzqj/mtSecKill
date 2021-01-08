@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/axgle/mahonia"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/network"
@@ -50,7 +49,7 @@ type jdSecKill struct {
 
 func NewJdSecKill(execPath string, skuId string, num, works int) *jdSecKill {
 	if works < 0 {
-		works = 1
+		works = 7
 	}
 	jsk :=  &jdSecKill{
 		ctx:    nil,
@@ -106,7 +105,7 @@ func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer st
 	logs.PrintlnSuccess("Get请求接口:", req.URL)
 //	logs.PrintlnSuccess(string(b))
 	logs.PrintlnInfo("=======================")
-	r := FormatJdResponse(b, req.URL.String(), false)
+	r := global.FormatJsonpResponse(b, req.URL.String(), false)
 	if r.Raw == "null" || r.Raw == "" {
 		return gjson.Result{}, errors.New("获取数据失败：" + r.Raw)
 	}
@@ -143,39 +142,14 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, 
 
 	logs.PrintlnSuccess("Post请求连接", req.URL)
 	logs.PrintlnInfo("=======================")
-	logs.PrintlnInfo("resp body:", string(b))
-	r := FormatJdResponse(b, req.URL.String(), false)
+	r := global.FormatJsonpResponse(b, req.URL.String(), false)
 	if r.Raw == "null" || r.Raw == "" {
 		return gjson.Result{}, errors.New("获取数据失败：" + r.Raw)
 	}
 	return r, nil
 }
 
-func FormatJdResponse(b []byte, prefix string, isConvertStr bool) gjson.Result {
-	r := string(b)
-	if isConvertStr {
-		r = mahonia.NewDecoder("gbk").ConvertString(r)
-	}
-	r = strings.TrimSpace(r)
-	if prefix != "" {
-		//这里针对http连接 自动提取jsonp的callback
-		if strings.HasPrefix(prefix, "http") {
-			pUrl, err := url.Parse(prefix)
-			if err == nil {
-				prefix = pUrl.Query().Get("callback")
-			}
-		}
-		logs.PrintlnInfo("prefix:", prefix)
-		r = strings.TrimPrefix(r, prefix)
-	}
-	if strings.HasSuffix(r, ")") || strings.HasPrefix(r, "(") {
-		r = strings.TrimRight(r, ";")
-		r = strings.TrimLeft(r, `(`)
-		r = strings.TrimRight(r, ")")
-	}
-	logs.PrintlnInfo(r)
-	return gjson.Parse(r)
-}
+
 
 //初始化监听请求数据
 func (jsk *jdSecKill) InitActionFunc() chromedp.ActionFunc {
@@ -189,7 +163,7 @@ func (jsk *jdSecKill) InitActionFunc() chromedp.ActionFunc {
 					if strings.Contains(e.Response.URL, "passport.jd.com/user/petName/getUserInfoForMiniJd.action") {
 						b, err := network.GetResponseBody(e.RequestID).Do(ctx)
 						if err == nil {
-							jsk.UserInfo = FormatJdResponse(b, e.Response.URL, false)
+							jsk.UserInfo = global.FormatJsonpResponse(b, e.Response.URL, false)
 						}
 						jsk.isLogin = true
 					}
@@ -208,6 +182,15 @@ func (jsk *jdSecKill) Run() error {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			logs.PrintlnInfo("等待登陆......")
 			for {
+				select {
+					case <-jsk.ctx.Done():
+						logs.PrintErr("浏览器被关闭，退出进程")
+						return nil
+					case <-jsk.bCtx.Done():
+						logs.PrintErr("浏览器被关闭，退出进程")
+						return nil
+					default:
+				}
 				if jsk.isLogin {
 					logs.PrintlnSuccess(jsk.UserInfo.Get("realName").String() + ", 登陆成功........")
 					break
@@ -219,9 +202,11 @@ func (jsk *jdSecKill) Run() error {
 		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			//提取抢购连接
-			jsk.FetchSecKillUrl()
 			for _, v := range jsk.bWorksCtx {
 				go func(ctx2 context.Context) {
+					jsk.FetchSecKillUrl()
+					logs.PrintlnInfo("正在访问抢购连接......")
+					_, _, _, _  = page.Navigate(jsk.SecKillUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx2)
 					SecKillRE:
 					//请求抢购连接，提交订单
 					err := jsk.ReqSubmitSecKillOrder(ctx2)
@@ -247,23 +232,35 @@ func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
 	return func(ctx context.Context) error {
 		u := "https://item.jd.com/"+jsk.SkuId+".html"
 		for i := 0; i < jsk.Works; i++ {
-			tid, err := target.CreateTarget(u).Do(ctx)
-			if err == nil {
-				c, _ := chromedp.NewContext(jsk.bCtx, chromedp.WithTargetID(tid))
-				_ = chromedp.Run(c, chromedp.Tasks{
-					chromedp.ActionFunc(func(ctx context.Context) error {
-						jsk.mu.Lock()
-						jsk.bWorksCtx = append(jsk.bWorksCtx, ctx)
-						jsk.mu.Unlock()
-						return nil
-					}),
-				})
-			}
+			go func() {
+				tid, err := target.CreateTarget(u).Do(ctx)
+				if err == nil {
+					c, _ := chromedp.NewContext(jsk.bCtx, chromedp.WithTargetID(tid))
+					_ = chromedp.Run(c, chromedp.Tasks{
+						chromedp.ActionFunc(func(ctx context.Context) error {
+							logs.PrintlnInfo("打开新的抢购标签.....")
+							jsk.mu.Lock()
+							jsk.bWorksCtx = append(jsk.bWorksCtx, ctx)
+							jsk.mu.Unlock()
+							return nil
+						}),
+					})
+				}
+			}()
 		}
 		_ = chromedp.Navigate(u).Do(ctx)
 		st := jsk.StartTime.UnixNano() / 1e6
 		logs.PrintlnInfo("等待时间到达"+jsk.StartTime.Format(global.DateTimeFormatStr)+"...... 请勿关闭浏览器")
 		for {
+			select {
+			case <-jsk.ctx.Done():
+				logs.PrintErr("浏览器被关闭，退出进程")
+				return nil
+			case <-jsk.bCtx.Done():
+				logs.PrintErr("浏览器被关闭，退出进程")
+				return nil
+			default:
+			}
 			if global.UnixMilli() - jsk.DiffTime >= st {
 				logs.PrintlnInfo("时间到达。。。。开始执行")
 				break
@@ -331,10 +328,10 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 func (jsk *jdSecKill) FetchSecKillUrl() {
 	logs.PrintlnInfo("开始获取抢购连接.....")
 	for {
-		jsk.SecKillUrl = jsk.GetSecKillUrl()
 		if jsk.SecKillUrl != "" {
 			break
 		}
+		jsk.SecKillUrl = jsk.GetSecKillUrl()
 		logs.PrintlnWarning("抢购链接获取失败.....正在重试")
 	}
 	jsk.SecKillUrl = "https:" + strings.TrimPrefix(jsk.SecKillUrl, "https:")
@@ -349,8 +346,6 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 		ctx = jsk.bCtx
 	}
 	//这里直接使用浏览器跳转 主要目的是获取cookie
-	logs.PrintlnInfo("正在访问抢购连接......")
-	_, _, _, _  = page.Navigate(jsk.SecKillUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx)
 	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
 	logs.PrintlnInfo("访问抢购订单结算页面......", skUrl)
 	_, _, _, _ = page.Navigate(skUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx)
@@ -380,7 +375,10 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 		jsk.IsOkChan <- struct{}{}
 		logs.PrintlnInfo("抢购成功，订单编号:", r.Get("orderId").String())
 	} else {
-		return errors.New("抢购失败：" + r.Raw)
+		if r.IsObject() || r.IsArray() {
+			return errors.New("抢购失败：" + r.Raw)
+		}
+		return errors.New("抢购失败,再接再厉")
 	}
 	return nil
 }

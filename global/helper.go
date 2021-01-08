@@ -4,10 +4,38 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"github.com/axgle/mahonia"
+	"github.com/tidwall/gjson"
 	"math/rand"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
+
+func FormatJsonpResponse(b []byte, prefix string, isConvertStr bool) gjson.Result {
+	r := string(b)
+	if isConvertStr {
+		r = mahonia.NewDecoder("gbk").ConvertString(r)
+	}
+	r = strings.TrimSpace(r)
+	if prefix != "" {
+		//这里针对http连接 自动提取jsonp的callback
+		if strings.HasPrefix(prefix, "http") {
+			pUrl, err := url.Parse(prefix)
+			if err == nil {
+				prefix = pUrl.Query().Get("callback")
+			}
+		}
+		r = strings.TrimPrefix(r, prefix)
+	}
+	if strings.HasSuffix(r, ")") || strings.HasPrefix(r, "(") {
+		r = strings.TrimRight(r, ";")
+		r = strings.TrimLeft(r, `(`)
+		r = strings.TrimRight(r, ")")
+	}
+	return gjson.Parse(r)
+}
 
 func UnixMilli() int64 {
 	return time.Now().UnixNano() / 1e6
