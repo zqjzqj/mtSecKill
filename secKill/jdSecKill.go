@@ -204,6 +204,15 @@ func (jsk *jdSecKill) Run() error {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			logs.PrintlnInfo("等待登陆......")
 			for {
+				select {
+					case <-jsk.ctx.Done():
+						logs.PrintErr("浏览器被关闭，退出进程")
+						return nil
+					case <-jsk.bCtx.Done():
+						logs.PrintErr("浏览器被关闭，退出进程")
+						return nil
+					default:
+				}
 				if jsk.isLogin {
 					logs.PrintlnSuccess(jsk.UserInfo.Get("realName").String() + ", 登陆成功........")
 					break
@@ -265,6 +274,15 @@ func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
 		st := jsk.StartTime.UnixNano() / 1e6
 		logs.PrintlnInfo("等待时间到达"+jsk.StartTime.Format(global.DateTimeFormatStr)+"...... 请勿关闭浏览器")
 		for {
+			select {
+			case <-jsk.ctx.Done():
+				logs.PrintErr("浏览器被关闭，退出进程")
+				return nil
+			case <-jsk.bCtx.Done():
+				logs.PrintErr("浏览器被关闭，退出进程")
+				return nil
+			default:
+			}
 			if global.UnixMilli() - jsk.DiffTime >= st {
 				logs.PrintlnInfo("时间到达。。。。开始执行")
 				break
