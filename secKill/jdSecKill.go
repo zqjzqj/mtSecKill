@@ -143,7 +143,6 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, 
 
 	logs.PrintlnSuccess("Post请求连接", req.URL)
 	logs.PrintlnInfo("=======================")
-	logs.PrintlnInfo("resp body:", string(b))
 	r := FormatJdResponse(b, req.URL.String(), false)
 	if r.Raw == "null" || r.Raw == "" {
 		return gjson.Result{}, errors.New("获取数据失败：" + r.Raw)
