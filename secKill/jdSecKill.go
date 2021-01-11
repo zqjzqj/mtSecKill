@@ -69,6 +69,14 @@ func NewJdSecKill(execPath string, skuId string, num, works int) *jdSecKill {
 	return jsk
 }
 
+func (jsk *jdSecKill) SetEid(eid string) {
+	jsk.eid = eid
+}
+
+func (jsk *jdSecKill) SetFp(fp string) {
+	jsk.fp = fp
+}
+
 func (jsk *jdSecKill) Stop() {
 	jsk.mu.Lock()
 	defer jsk.mu.Unlock()
@@ -312,6 +320,12 @@ func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
 
 func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 	return func(ctx context.Context) error {
+		logs.PrintlnInfo(jsk.fp, jsk.eid)
+		if jsk.eid != "" && jsk.fp != "" {
+			logs.PrintlnInfo("已传入eid与fp，程序将不再自动获取 ")
+			logs.PrintlnInfo("eid : ", jsk.eid, "fp : ", jsk.fp)
+			return nil
+		}
 		RE:
 		logs.PrintlnInfo("正在获取eid和fp参数....")
 		_ = chromedp.Navigate("https://search.jd.com/Search?keyword=衣服").Do(ctx)
