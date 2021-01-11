@@ -403,6 +403,7 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 		err := jsk.GetSecKillInitInfo(ctx)
 		if err != nil {
 			logs.PrintErr("抢购失败：", err, "正在重试.......")
+			continue
 		}
 		break
 	}
