@@ -399,14 +399,12 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	_, _, _, _ = page.Navigate(skUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx)*/
 
 	logs.PrintlnInfo("获取抢购信息...............")
-	for {
-		err := jsk.GetSecKillInitInfo(ctx)
-		if err != nil {
-			logs.PrintErr("抢购失败：", err, "正在重试.......")
-			continue
-		}
-		break
+	err = jsk.GetSecKillInitInfo(ctx)
+	if err != nil {
+		logs.PrintErr("抢购失败：", err, "正在重试.......")
+		return err
 	}
+
 	orderData := jsk.GetOrderReqData()
 
 	if len(orderData) == 0 {
