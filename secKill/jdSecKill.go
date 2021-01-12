@@ -241,7 +241,7 @@ func (jsk *jdSecKill) Run() error {
 			}
 			return nil
 		}),
-		//jsk.GetEidAndFp(),
+		jsk.GetEidAndFp(),
 		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			//提取抢购连接
