@@ -113,7 +113,10 @@ func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer st
 	}
 	//设置cookie到浏览器
 	for _, respCookie := range resp.Cookies() {
-		_, _ = network.SetCookie(respCookie.Name, respCookie.Value).WithURL(resp.Request.URL.String()).Do(ctx)
+		ok, err := network.SetCookie(respCookie.Name, respCookie.Value).WithURL(resp.Request.URL.String()).Do(ctx)
+		if !ok {
+			logs.PrintErr(respCookie.Name, respCookie.Value, " cookie设置失败", err)
+		}
 	}
 	defer resp.Body.Close()
 	b, _ := ioutil.ReadAll(resp.Body)
@@ -238,7 +241,7 @@ func (jsk *jdSecKill) Run() error {
 			}
 			return nil
 		}),
-		jsk.GetEidAndFp(),
+		//jsk.GetEidAndFp(),
 		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			//提取抢购连接
@@ -403,17 +406,14 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	//这里修改为直接使用http请求访问抢购结算页面 提高速度
 	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
 	logs.PrintlnInfo("访问抢购订单结算页面......", skUrl)
-	_, err := jsk.GetReq(skUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", ctx, true)
-	if err != nil {
-		return err
-	}
+	_, _ = jsk.GetReq(skUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", ctx, true)
 
 	//这里直接使用浏览器跳转 主要目的是获取cookie
 	/*jsk.GetReq(skUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", ctx)
 	_, _, _, _ = page.Navigate(skUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx)*/
 
 	logs.PrintlnInfo("获取抢购信息...............")
-	err = jsk.GetSecKillInitInfo(ctx)
+	err := jsk.GetSecKillInitInfo(ctx)
 	if err != nil {
 		logs.PrintErr("抢购失败：", err, "正在重试.......")
 		return err
