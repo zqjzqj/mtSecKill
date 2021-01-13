@@ -436,7 +436,6 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, skUrl, ctx, false)
 	if err != nil {
 		logs.PrintErr("订单提交失败，正在重新提交.....", " errMsg => ", err, " raw => ", r.Raw)
-		logs.PrintErr("抢购失败：", err)
 		return err
 	}
 	orderId := r.Get("orderId").String()
