@@ -247,10 +247,12 @@ func (jsk *jdSecKill) Run() error {
 			return nil
 		}),
 		jsk.GetEidAndFp(),
-		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
+			u := "https://item.jd.com/" + jsk.SkuId + ".html"
+			_ = chromedp.Navigate(u).Do(ctx)
 			for i := 0; i < jsk.Works; i++ {
 				go func() {
+					jsk.WaitStart()
 					for {
 						jsk.FetchSecKillUrl()
 						logs.PrintlnInfo("正在访问抢购连接......")
@@ -282,28 +284,23 @@ func (jsk *jdSecKill) Run() error {
 	})
 }
 
-func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
-	return func(ctx context.Context) error {
-		u := "https://item.jd.com/" + jsk.SkuId + ".html"
-		_ = chromedp.Navigate(u).Do(ctx)
-		st := jsk.StartTime.UnixNano() / 1e6
-		logs.PrintlnInfo("等待时间到达" + jsk.StartTime.Format(global.DateTimeFormatStr) + "...... 请勿关闭浏览器")
-		for {
-			select {
-			case <-jsk.ctx.Done():
-				logs.PrintErr("浏览器被关闭，退出进程")
-				return nil
-			case <-jsk.bCtx.Done():
-				logs.PrintErr("浏览器被关闭，退出进程")
-				return nil
-			default:
-			}
-			if global.UnixMilli()-jsk.DiffTime >= st {
-				logs.PrintlnInfo("时间到达。。。。开始执行")
-				break
-			}
+func (jsk *jdSecKill) WaitStart() {
+	st := jsk.StartTime.UnixNano() / 1e6
+	logs.PrintlnInfo("等待时间到达" + jsk.StartTime.Format(global.DateTimeFormatStr) + "...... 请勿关闭浏览器")
+	for {
+		select {
+		case <-jsk.ctx.Done():
+			logs.PrintErr("浏览器被关闭，退出进程")
+			return
+		case <-jsk.bCtx.Done():
+			logs.PrintErr("浏览器被关闭，退出进程")
+			return
+		default:
 		}
-		return nil
+		if global.UnixMilli()-jsk.DiffTime >= st {
+			logs.PrintlnInfo("时间到达。。。。开始执行")
+			break
+		}
 	}
 }
 
