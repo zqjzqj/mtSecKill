@@ -9,6 +9,7 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
+	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
 	"github.com/tidwall/gjson"
 	"github.com/zqijzqj/mtSecKill/chromedpEngine"
@@ -334,15 +335,28 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 		_ = chromedp.Sleep(1 * time.Second).Do(ctx)
 		_ = chromedp.Click("#GotoShoppingCart").Do(ctx)
 		//_ = chromedp.Navigate("https://cart.jd.com/cart_index/").Do(ctx)
-		_ = chromedp.WaitVisible("container", chromedp.ByID).Do(ctx)
-		_ = chromedp.ScrollIntoView(".submit-btn").Do(ctx);
-		_ = chromedp.Sleep(1 * time.Second).Do(ctx);
-		_ = chromedp.Click(".submit-btn").Do(ctx)
-		//_ = chromedp.WaitVisible("#mainframe").Do(ctx)
 		ch, cc := chromedpEngine.WaitDocumentUpdated(ctx)
-		defer cc()
+		logs.PrintlnInfo("等待购物车页面.....")
+		<-ch
+		cc()
+		info, _ := target.GetTargetInfo().Do(ctx)
+		if strings.Contains(info.URL, "cart.jd.com/cart_index") {
+			logs.PrintlnInfo("Click, common-submit-btn")
+			_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+			_ = chromedp.Click(".common-submit-btn").Do(ctx)
+		} else {
+			logs.PrintlnInfo("Click, submit-btn")
+			_ = chromedp.WaitVisible("container", chromedp.ByID).Do(ctx)
+			_ = chromedp.ScrollIntoView(".submit-btn").Do(ctx);
+			_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+			_ = chromedp.Click(".submit-btn").Do(ctx)
+		}
+
+		//_ = chromedp.WaitVisible("#mainframe").Do(ctx)
+		ch, cc = chromedpEngine.WaitDocumentUpdated(ctx)
 		logs.PrintlnInfo("等待结算页加载完成..... 如遇到未选中商品错误，可手动选中后点击结算")
 		<-ch
+		cc()
 		//执行js参数 将eid和fp显示到对应元素上
 		_ = chromedp.Sleep(3 * time.Second).Do(ctx)
 		res := make(map[string]interface{})
@@ -368,6 +382,8 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 }
 
 func (jsk *jdSecKill) FetchSecKillUrl() {
+	/*jsk.SecKillUrl = "https://marathon.jd.com/captcha.html?skuId="+jsk.SkuId+"&sn=c3f4ececd8461f0e4d7267e96a91e0e0&from=pc"
+	return*/
 	logs.PrintlnInfo("开始获取抢购连接.....")
 	for {
 		if jsk.SecKillUrl != "" {
@@ -416,7 +432,7 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 RE:
 	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, skUrl, ctx, false)
 	if err != nil {
-		if submitCount < 10 {
+		if submitCount < 2 {
 			logs.PrintErr("订单提交失败，正在重新提交..... 重提次数：", submitCount, " errMsg => ", err)
 			submitCount++
 			goto RE
