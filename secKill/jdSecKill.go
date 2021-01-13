@@ -404,6 +404,11 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 		ctx = jsk.bCtx
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			logs.PrintErr(r)
+		}
+	}()
 	//这里修改为直接使用http请求访问抢购结算页面 提高速度
 	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
 	logs.PrintlnInfo("访问抢购订单结算页面......", skUrl)
@@ -428,15 +433,9 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	logs.PrintlnInfo("订单参数：", orderData.Encode())
 	logs.PrintlnInfo("提交抢购订单.............")
 
-	submitCount := 1
-RE:
 	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, skUrl, ctx, false)
 	if err != nil {
-		if submitCount < 2 {
-			logs.PrintErr("订单提交失败，正在重新提交..... 重提次数：", submitCount, " errMsg => ", err)
-			submitCount++
-			goto RE
-		}
+		logs.PrintErr("订单提交失败，正在重新提交.....", " errMsg => ", err, " raw => ", r.Raw)
 		logs.PrintErr("抢购失败：", err)
 		return err
 	}
