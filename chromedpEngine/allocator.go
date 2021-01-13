@@ -33,7 +33,6 @@ var DefaultOptions = []chromedp.ExecAllocatorOption{
 	chromedp.Flag("disable-plugins", false),
 	//chromedp.Flag("disable-software-rasterizer", true),
 	chromedp.NoDefaultBrowserCheck,
-	chromedp.DisableGPU,
 	chromedp.NoFirstRun,
 }
 
