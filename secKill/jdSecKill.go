@@ -31,7 +31,6 @@ type jdSecKill struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	bCtx        context.Context
-	bWorksCtx   []context.Context
 	isLogin     bool
 	isClose     bool
 	mu          sync.Mutex
@@ -111,6 +110,9 @@ func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer st
 	if err != nil {
 		return gjson.Result{}, err
 	}
+	if resp.StatusCode != 200 {
+		logs.PrintlnWarning("httpCode: ", resp.StatusCode, "reqUrl: ", resp.Request.URL)
+	}
 	//设置cookie到浏览器
 	for _, respCookie := range resp.Cookies() {
 		ok, err := network.SetCookie(respCookie.Name, respCookie.Value).WithURL(resp.Request.URL.String()).Do(ctx)
@@ -154,6 +156,10 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, 
 	resp, err := chromedpEngine.RequestByCookie(ctx, req, isDisableRedirects)
 	if err != nil {
 		return gjson.Result{}, err
+	}
+
+	if resp.StatusCode != 200 {
+		logs.PrintlnWarning("httpCode: ", resp.StatusCode, "reqUrl: ", resp.Request.URL)
 	}
 	//设置cookie到浏览器
 	for _, respCookie := range resp.Cookies() {
@@ -242,30 +248,30 @@ func (jsk *jdSecKill) Run() error {
 			return nil
 		}),
 		jsk.GetEidAndFp(),
-		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			//提取抢购连接
-			for _, v := range jsk.bWorksCtx {
-				go func(ctx2 context.Context) {
+			u := "https://item.jd.com/" + jsk.SkuId + ".html"
+			_ = chromedp.Navigate(u).Do(ctx)
+			for i := 0; i < jsk.Works; i++ {
+				go func() {
+					jsk.WaitStart()
 					for {
 						jsk.FetchSecKillUrl()
 						logs.PrintlnInfo("正在访问抢购连接......")
-						_, err := jsk.GetReq(jsk.SecKillUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", ctx2, true)
+						_, err := jsk.GetReq(jsk.SecKillUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", jsk.bCtx, true)
+						//这里访问会响应302 禁止重定向后就会是空数据 所以这里空数据是正常的
 						if err == nil || err.Error() == ErrEmptyData.Error() {
 							break
 						}
-						logs.PrintErr("抢购连接访问错误，正在重试：", err)
 					}
-					//_, _, _, _  = page.Navigate(jsk.SecKillUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx2)
-				SecKillRE:
+					SecKillRE:
 					//请求抢购连接，提交订单
-					err := jsk.ReqSubmitSecKillOrder(ctx2)
+					err := jsk.ReqSubmitSecKillOrder(jsk.bCtx)
 					if err != nil {
 						logs.PrintlnInfo(err, "等待重试")
 						goto SecKillRE
 					}
-					_ = chromedp.Navigate("https://order.jd.com/center/list.action").Do(ctx2)
-				}(v)
+					_ = chromedp.Navigate("https://order.jd.com/center/list.action").Do(jsk.bCtx)
+				}()
 			}
 			select {
 			case <-jsk.IsOkChan:
@@ -279,45 +285,23 @@ func (jsk *jdSecKill) Run() error {
 	})
 }
 
-func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
-	return func(ctx context.Context) error {
-		u := "https://item.jd.com/" + jsk.SkuId + ".html"
-		for i := 0; i < jsk.Works; i++ {
-			go func() {
-				tid, err := target.CreateTarget(u).Do(ctx)
-				if err == nil {
-					c, _ := chromedp.NewContext(jsk.bCtx, chromedp.WithTargetID(tid))
-					_ = chromedp.Run(c, chromedp.Tasks{
-						chromedp.ActionFunc(func(ctx context.Context) error {
-							logs.PrintlnInfo("打开新的抢购标签.....")
-							jsk.mu.Lock()
-							jsk.bWorksCtx = append(jsk.bWorksCtx, ctx)
-							jsk.mu.Unlock()
-							return nil
-						}),
-					})
-				}
-			}()
+func (jsk *jdSecKill) WaitStart() {
+	st := jsk.StartTime.UnixNano() / 1e6
+	logs.PrintlnInfo("等待时间到达" + jsk.StartTime.Format(global.DateTimeFormatStr) + "...... 请勿关闭浏览器")
+	for {
+		select {
+		case <-jsk.ctx.Done():
+			logs.PrintErr("浏览器被关闭，退出进程")
+			return
+		case <-jsk.bCtx.Done():
+			logs.PrintErr("浏览器被关闭，退出进程")
+			return
+		default:
 		}
-		_ = chromedp.Navigate(u).Do(ctx)
-		st := jsk.StartTime.UnixNano() / 1e6
-		logs.PrintlnInfo("等待时间到达" + jsk.StartTime.Format(global.DateTimeFormatStr) + "...... 请勿关闭浏览器")
-		for {
-			select {
-			case <-jsk.ctx.Done():
-				logs.PrintErr("浏览器被关闭，退出进程")
-				return nil
-			case <-jsk.bCtx.Done():
-				logs.PrintErr("浏览器被关闭，退出进程")
-				return nil
-			default:
-			}
-			if global.UnixMilli()-jsk.DiffTime >= st {
-				logs.PrintlnInfo("时间到达。。。。开始执行")
-				break
-			}
+		if global.UnixMilli()-jsk.DiffTime >= st {
+			logs.PrintlnInfo("时间到达。。。。开始执行")
+			break
 		}
-		return nil
 	}
 }
 
@@ -351,13 +335,28 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 		_ = chromedp.Sleep(1 * time.Second).Do(ctx)
 		_ = chromedp.Click("#GotoShoppingCart").Do(ctx)
 		//_ = chromedp.Navigate("https://cart.jd.com/cart_index/").Do(ctx)
-		_ = chromedp.WaitVisible("#cart-body").Do(ctx)
-		_ = chromedp.Click(".common-submit-btn").Do(ctx)
-		//_ = chromedp.WaitVisible("#mainframe").Do(ctx)
 		ch, cc := chromedpEngine.WaitDocumentUpdated(ctx)
-		defer cc()
+		logs.PrintlnInfo("等待购物车页面.....")
+		<-ch
+		cc()
+		info, _ := target.GetTargetInfo().Do(ctx)
+		if strings.Contains(info.URL, "cart.jd.com/cart_index") {
+			logs.PrintlnInfo("Click, common-submit-btn")
+			_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+			_ = chromedp.Click(".common-submit-btn").Do(ctx)
+		} else {
+			logs.PrintlnInfo("Click, submit-btn")
+			_ = chromedp.WaitVisible("container", chromedp.ByID).Do(ctx)
+			_ = chromedp.ScrollIntoView(".submit-btn").Do(ctx);
+			_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+			_ = chromedp.Click(".submit-btn").Do(ctx)
+		}
+
+		//_ = chromedp.WaitVisible("#mainframe").Do(ctx)
+		ch, cc = chromedpEngine.WaitDocumentUpdated(ctx)
 		logs.PrintlnInfo("等待结算页加载完成..... 如遇到未选中商品错误，可手动选中后点击结算")
 		<-ch
+		cc()
 		//执行js参数 将eid和fp显示到对应元素上
 		_ = chromedp.Sleep(3 * time.Second).Do(ctx)
 		res := make(map[string]interface{})
@@ -383,6 +382,8 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 }
 
 func (jsk *jdSecKill) FetchSecKillUrl() {
+	/*jsk.SecKillUrl = "https://marathon.jd.com/captcha.html?skuId="+jsk.SkuId+"&sn=c3f4ececd8461f0e4d7267e96a91e0e0&from=pc"
+	return*/
 	logs.PrintlnInfo("开始获取抢购连接.....")
 	for {
 		if jsk.SecKillUrl != "" {
@@ -404,7 +405,7 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	}
 
 	//这里修改为直接使用http请求访问抢购结算页面 提高速度
-	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
+	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
 	logs.PrintlnInfo("访问抢购订单结算页面......", skUrl)
 	_, _ = jsk.GetReq(skUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", ctx, true)
 
@@ -431,7 +432,7 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 RE:
 	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, skUrl, ctx, false)
 	if err != nil {
-		if submitCount < 10 {
+		if submitCount < 2 {
 			logs.PrintErr("订单提交失败，正在重新提交..... 重提次数：", submitCount, " errMsg => ", err)
 			submitCount++
 			goto RE
@@ -547,9 +548,6 @@ func (jsk *jdSecKill) GetSecKillInitInfo(ctx context.Context) error {
 }
 
 func (jsk *jdSecKill) GetSecKillUrl() string {
-	req, _ := http.NewRequest("GET", "https://itemko.jd.com/itemShowBtn", nil)
-	req.Header.Add("User-Agent", jsk.userAgent)
-	req.Header.Add("Referer", "https://item.jd.com/"+jsk.SkuId+".html")
 	r, _ := jsk.GetReq("https://itemko.jd.com/itemShowBtn", map[string]string{
 		"callback": "jQuery" + strconv.FormatInt(global.GenerateRangeNum(1000000, 9999999), 10),
 		"skuId":    jsk.SkuId,
