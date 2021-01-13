@@ -337,8 +337,10 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 		_ = chromedp.Sleep(1 * time.Second).Do(ctx)
 		_ = chromedp.Click("#GotoShoppingCart").Do(ctx)
 		//_ = chromedp.Navigate("https://cart.jd.com/cart_index/").Do(ctx)
-		_ = chromedp.WaitVisible("#cart-body").Do(ctx)
-		_ = chromedp.Click(".common-submit-btn").Do(ctx)
+		_ = chromedp.WaitVisible("container", chromedp.ByID).Do(ctx)
+		_ = chromedp.ScrollIntoView(".submit-btn").Do(ctx);
+		_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+		_ = chromedp.Click(".submit-btn").Do(ctx)
 		//_ = chromedp.WaitVisible("#mainframe").Do(ctx)
 		ch, cc := chromedpEngine.WaitDocumentUpdated(ctx)
 		defer cc()
