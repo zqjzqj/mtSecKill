@@ -135,7 +135,7 @@ func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer st
 }
 
 func (jsk *jdSecKill) SyncJdTime() {
-	resp, err := http.Get("https://a.jd.com/ajax/queryServerData.html")
+	resp, err := http.Get("https://a.jd.com//ajax/queryServerData.html")
 	if err != nil {
 		logs.PrintErr(err)
 		os.Exit(0)
@@ -305,9 +305,13 @@ func (jsk *jdSecKill) WaitStart() {
 			return
 		default:
 		}
-		if global.UnixMilli()-jsk.DiffTime >= st {
-			logs.PrintlnInfo("时间到达。。。。开始执行")
+		d := global.UnixMilli()-jsk.DiffTime
+		if d >= st {
+			logs.PrintlnInfo("时间到达。。。。开始执行", time.Now().Format(global.DateTimeFormatStr))
 			break
+		}
+		if st - d - 4 > 0 {
+			time.Sleep(time.Duration(st - d - 4) * time.Millisecond)
 		}
 	}
 }
