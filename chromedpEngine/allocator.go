@@ -21,17 +21,14 @@ var DefaultOptions = []chromedp.ExecAllocatorOption{
 	chromedp.Flag("mute-audio", true),
 	chromedp.Flag("disable-infobars", true),
 	chromedp.Flag("enable-automation", false),
-	chromedp.Flag("ignore-certificate-errors", true),
 	chromedp.Flag("start-maximized", true),
 
-	//chromedp.Flag("blink-settings", "imagesEnabled=false"),
 	chromedp.Flag("disable-default-apps", false),
 	chromedp.Flag("no-sandbox", false),
 	// 隐身模式启动
 	//chromedp.Flag("incognito", true),
 	chromedp.Flag("disable-extensions", false),
 	chromedp.Flag("disable-plugins", false),
-	//chromedp.Flag("disable-software-rasterizer", true),
 	chromedp.NoDefaultBrowserCheck,
 	chromedp.NoFirstRun,
 }

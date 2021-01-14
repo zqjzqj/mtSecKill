@@ -12,12 +12,14 @@ import (
 )
 
 var skuId = flag.String("sku", "100012043978", "茅台商品ID")
-var num = flag.Int("num", 2, "茅台商品ID")
-var works = flag.Int("works", 7, "并发数")
+var num = flag.Int("num", 2, "商品数量")
+var works = flag.Int("works", 5, "并发数")
 var start = flag.String("time", "09:59:59.500", "开始时间---不带日期")
 var brwoserPath = flag.String("execPath", "", "浏览器执行路径，路径不能有空格")
 var eid = flag.String("eid", "", "如果不传入，可自动获取，对于无法获取的用户可手动传入参数")
 var fp = flag.String("fp", "", "如果不传入，可自动获取，对于无法获取的用户可手动传入参数")
+var payPwd = flag.String("payPwd", "", "支付密码 可不填")
+
 func init() {
 	flag.Parse()
 }
@@ -35,6 +37,7 @@ func main() {
 		logs.Fatal("开始时间初始化失败", err)
 	}
 
+	jdSecKill.PayPwd = *payPwd
 	if *eid != "" {
 		if *fp == "" {
 			logs.Fatal("请传入fp参数")

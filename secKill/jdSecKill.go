@@ -47,6 +47,7 @@ type jdSecKill struct {
 	IsOk        bool
 	StartTime   time.Time
 	DiffTime    int64
+	PayPwd string
 }
 
 func NewJdSecKill(execPath string, skuId string, num, works int) *jdSecKill {
@@ -497,7 +498,7 @@ func (jsk *jdSecKill) GetOrderReqData() url.Values {
 		"invoicePhone":       []string{invoiceInfo.Get("invoicePhone").String()},
 		"invoicePhoneKey":    []string{invoiceInfo.Get("invoicePhoneKey").String()},
 		"invoice":            []string{"true"},
-		"password":           []string{""},
+		"password":           []string{jsk.PayPwd},
 		"codTimeType":        []string{"3"},
 		"paymentType":        []string{"4"},
 		"areaCode":           []string{""},
