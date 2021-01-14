@@ -25,46 +25,55 @@ import (
 	"time"
 )
 
+var ErrEmptyData = errors.New("空数据")
+
 type jdSecKill struct {
-	ctx context.Context
-	cancel context.CancelFunc
-	bCtx context.Context
-	bWorksCtx []context.Context
-	isLogin bool
-	isClose bool
-	mu sync.Mutex
-	userAgent string
-	UserInfo gjson.Result
-	SkuId string
-	SecKillUrl string
-	SecKillNum int
+	ctx         context.Context
+	cancel      context.CancelFunc
+	bCtx        context.Context
+	isLogin     bool
+	isClose     bool
+	mu          sync.Mutex
+	userAgent   string
+	UserInfo    gjson.Result
+	SkuId       string
+	SecKillUrl  string
+	SecKillNum  int
 	SecKillInfo gjson.Result
-	eid string
-	fp string
-	Works int
-	IsOkChan chan struct{}
-	IsOk bool
-	StartTime time.Time
-	DiffTime int64
+	eid         string
+	fp          string
+	Works       int
+	IsOkChan    chan struct{}
+	IsOk        bool
+	StartTime   time.Time
+	DiffTime    int64
 }
 
 func NewJdSecKill(execPath string, skuId string, num, works int) *jdSecKill {
 	if works < 0 {
 		works = 1
 	}
-	jsk :=  &jdSecKill{
-		ctx:    nil,
-		isLogin: false,
-		isClose: false,
-		userAgent:chromedpEngine.GetRandUserAgent(),
-		SkuId:skuId,
-		SecKillNum:num,
-		Works:works,
-		IsOk:false,
-		IsOkChan:make(chan struct{}, 1),
+	jsk := &jdSecKill{
+		ctx:        nil,
+		isLogin:    false,
+		isClose:    false,
+		userAgent:  chromedpEngine.GetRandUserAgent(),
+		SkuId:      skuId,
+		SecKillNum: num,
+		Works:      works,
+		IsOk:       false,
+		IsOkChan:   make(chan struct{}, 1),
 	}
 	jsk.ctx, jsk.cancel = chromedpEngine.NewExecCtx(chromedp.ExecPath(execPath), chromedp.UserAgent(jsk.userAgent))
 	return jsk
+}
+
+func (jsk *jdSecKill) SetEid(eid string) {
+	jsk.eid = eid
+}
+
+func (jsk *jdSecKill) SetFp(fp string) {
+	jsk.fp = fp
 }
 
 func (jsk *jdSecKill) Stop() {
@@ -79,7 +88,7 @@ func (jsk *jdSecKill) Stop() {
 	return
 }
 
-func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer string, ctx context.Context) (gjson.Result, error) {
+func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer string, ctx context.Context, isDisableRedirects bool) (gjson.Result, error) {
 	if referer == "" {
 		referer = "https://www.jd.com"
 	}
@@ -97,18 +106,28 @@ func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer st
 		}
 		req.URL.RawQuery = q.Encode()
 	}
-	resp, err := chromedpEngine.RequestByCookie(ctx, req)
+	resp, err := chromedpEngine.RequestByCookie(ctx, req, isDisableRedirects)
 	if err != nil {
 		return gjson.Result{}, err
+	}
+	if resp.StatusCode != 200 {
+		logs.PrintlnWarning("httpCode: ", resp.StatusCode, "reqUrl: ", resp.Request.URL)
+	}
+	//设置cookie到浏览器
+	for _, respCookie := range resp.Cookies() {
+		ok, err := network.SetCookie(respCookie.Name, respCookie.Value).WithURL(resp.Request.URL.String()).Do(ctx)
+		if !ok {
+			logs.PrintErr(respCookie.Name, respCookie.Value, " cookie设置失败", err)
+		}
 	}
 	defer resp.Body.Close()
 	b, _ := ioutil.ReadAll(resp.Body)
 	logs.PrintlnSuccess("Get请求接口:", req.URL)
-//	logs.PrintlnSuccess(string(b))
+	//	logs.PrintlnSuccess(string(b))
 	logs.PrintlnInfo("=======================")
 	r := FormatJdResponse(b, req.URL.String(), false)
 	if r.Raw == "null" || r.Raw == "" {
-		return gjson.Result{}, errors.New("获取数据失败：" + r.Raw)
+		return gjson.Result{}, ErrEmptyData
 	}
 	return r, nil
 }
@@ -123,7 +142,7 @@ func (jsk *jdSecKill) SyncJdTime() {
 	logs.PrintlnInfo("服务器与本地时间差为: ", jsk.DiffTime, "ms")
 }
 
-func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, ctx context.Context) (gjson.Result, error) {
+func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, ctx context.Context, isDisableRedirects bool) (gjson.Result, error) {
 	if ctx == nil {
 		ctx = jsk.bCtx
 	}
@@ -134,19 +153,26 @@ func (jsk *jdSecKill) PostReq(reqUrl string, params url.Values, referer string, 
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Host", req.URL.Host)
-	resp, err := chromedpEngine.RequestByCookie(ctx, req)
+	resp, err := chromedpEngine.RequestByCookie(ctx, req, isDisableRedirects)
 	if err != nil {
 		return gjson.Result{}, err
+	}
+
+	if resp.StatusCode != 200 {
+		logs.PrintlnWarning("httpCode: ", resp.StatusCode, "reqUrl: ", resp.Request.URL)
+	}
+	//设置cookie到浏览器
+	for _, respCookie := range resp.Cookies() {
+		_, _ = network.SetCookie(respCookie.Name, respCookie.Value).WithURL(resp.Request.URL.String()).Do(ctx)
 	}
 	defer resp.Body.Close()
 	b, _ := ioutil.ReadAll(resp.Body)
 
 	logs.PrintlnSuccess("Post请求连接", req.URL)
 	logs.PrintlnInfo("=======================")
-	logs.PrintlnInfo("resp body:", string(b))
 	r := FormatJdResponse(b, req.URL.String(), false)
 	if r.Raw == "null" || r.Raw == "" {
-		return gjson.Result{}, errors.New("获取数据失败：" + r.Raw)
+		return gjson.Result{}, ErrEmptyData
 	}
 	return r, nil
 }
@@ -205,6 +231,15 @@ func (jsk *jdSecKill) Run() error {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			logs.PrintlnInfo("等待登陆......")
 			for {
+				select {
+				case <-jsk.ctx.Done():
+					logs.PrintErr("浏览器被关闭，退出进程")
+					return nil
+				case <-jsk.bCtx.Done():
+					logs.PrintErr("浏览器被关闭，退出进程")
+					return nil
+				default:
+				}
 				if jsk.isLogin {
 					logs.PrintlnSuccess(jsk.UserInfo.Get("realName").String() + ", 登陆成功........")
 					break
@@ -213,71 +248,74 @@ func (jsk *jdSecKill) Run() error {
 			return nil
 		}),
 		jsk.GetEidAndFp(),
-		jsk.WaitStart(),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			//提取抢购连接
-			for _, v := range jsk.bWorksCtx {
-				go func(ctx2 context.Context) {
-					jsk.FetchSecKillUrl()
+			u := "https://item.jd.com/" + jsk.SkuId + ".html"
+			_ = chromedp.Navigate(u).Do(ctx)
+			for i := 0; i < jsk.Works; i++ {
+				go func() {
+					jsk.WaitStart()
+					for {
+						jsk.FetchSecKillUrl()
+						logs.PrintlnInfo("正在访问抢购连接......")
+						_, err := jsk.GetReq(jsk.SecKillUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", jsk.bCtx, true)
+						//这里访问会响应302 禁止重定向后就会是空数据 所以这里空数据是正常的
+						if err == nil || err.Error() == ErrEmptyData.Error() {
+							break
+						}
+					}
 					SecKillRE:
 					//请求抢购连接，提交订单
-					err := jsk.ReqSubmitSecKillOrder(ctx2)
+					err := jsk.ReqSubmitSecKillOrder(jsk.bCtx)
 					if err != nil {
 						logs.PrintlnInfo(err, "等待重试")
 						goto SecKillRE
 					}
-				}(v)
+					_ = chromedp.Navigate("https://order.jd.com/center/list.action").Do(jsk.bCtx)
+				}()
 			}
 			select {
-				case <-jsk.IsOkChan:
-					logs.PrintlnInfo("抢购成功。。。10s后关闭进程...")
-					_ = chromedp.Sleep(10 * time.Second).Do(ctx)
-				case <-jsk.ctx.Done():
-				case <-jsk.bCtx.Done():
+			case <-jsk.IsOkChan:
+				logs.PrintlnInfo("抢购成功。。。10s后关闭进程...")
+				_ = chromedp.Sleep(10 * time.Second).Do(ctx)
+			case <-jsk.ctx.Done():
+			case <-jsk.bCtx.Done():
 			}
 			return nil
 		}),
 	})
 }
 
-func (jsk *jdSecKill) WaitStart() chromedp.ActionFunc {
-	return func(ctx context.Context) error {
-		u := "https://item.jd.com/"+jsk.SkuId+".html"
-		for i := 0; i < jsk.Works; i++ {
-			go func() {
-				tid, err := target.CreateTarget(u).Do(ctx)
-				if err == nil {
-					c, _ := chromedp.NewContext(jsk.bCtx, chromedp.WithTargetID(tid))
-					_ = chromedp.Run(c, chromedp.Tasks{
-						chromedp.ActionFunc(func(ctx context.Context) error {
-							logs.PrintlnInfo("打开新的抢购标签.....")
-							jsk.mu.Lock()
-							jsk.bWorksCtx = append(jsk.bWorksCtx, ctx)
-							jsk.mu.Unlock()
-							return nil
-						}),
-					})
-				}
-			}()
+func (jsk *jdSecKill) WaitStart() {
+	st := jsk.StartTime.UnixNano() / 1e6
+	logs.PrintlnInfo("等待时间到达" + jsk.StartTime.Format(global.DateTimeFormatStr) + "...... 请勿关闭浏览器")
+	for {
+		select {
+		case <-jsk.ctx.Done():
+			logs.PrintErr("浏览器被关闭，退出进程")
+			return
+		case <-jsk.bCtx.Done():
+			logs.PrintErr("浏览器被关闭，退出进程")
+			return
+		default:
 		}
-		_ = chromedp.Navigate(u).Do(ctx)
-		st := jsk.StartTime.UnixNano() / 1e6
-		logs.PrintlnInfo("等待时间到达"+jsk.StartTime.Format(global.DateTimeFormatStr)+"...... 请勿关闭浏览器")
-		for {
-			if global.UnixMilli() - jsk.DiffTime >= st {
-				logs.PrintlnInfo("时间到达。。。。开始执行")
-				break
-			}
+		if global.UnixMilli()-jsk.DiffTime >= st {
+			logs.PrintlnInfo("时间到达。。。。开始执行")
+			break
 		}
-		return nil
 	}
 }
 
 func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 	return func(ctx context.Context) error {
-		RE:
+		logs.PrintlnInfo(jsk.fp, jsk.eid)
+		if jsk.eid != "" && jsk.fp != "" {
+			logs.PrintlnInfo("已传入eid与fp，程序将不再自动获取 ")
+			logs.PrintlnInfo("eid : ", jsk.eid, "fp : ", jsk.fp)
+			return nil
+		}
+	RE:
 		logs.PrintlnInfo("正在获取eid和fp参数....")
-		_ = chromedp.Navigate("https://search.jd.com/Search?keyword=乌江榨菜").Do(ctx)
+		_ = chromedp.Navigate("https://search.jd.com/Search?keyword=衣服").Do(ctx)
 		logs.PrintlnInfo("等待页面更新完成....")
 		_ = chromedp.WaitVisible(".gl-item").Do(ctx)
 		var itemNodes []*cdp.Node
@@ -287,23 +325,38 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 		}
 		n := itemNodes[rand.Intn(len(itemNodes))]
 		_ = dom.ScrollIntoViewIfNeeded().WithNodeID(n.NodeID).Do(ctx)
-		_, _, _, _ = page.Navigate("https://item.jd.com/"+n.AttributeValue("data-sku")+".html").Do(ctx)
+		_, _, _, _ = page.Navigate("https://item.jd.com/" + n.AttributeValue("data-sku") + ".html").Do(ctx)
 
 		logs.PrintlnInfo("等待商品详情页更新完成....")
 		_ = chromedp.WaitVisible("#InitCartUrl").Do(ctx)
-		_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+		_ = chromedp.Sleep(1 * time.Second).Do(ctx)
 		_ = chromedp.Click("#InitCartUrl").Do(ctx)
 		_ = chromedp.WaitVisible("#GotoShoppingCart").Do(ctx)
-		_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+		_ = chromedp.Sleep(1 * time.Second).Do(ctx)
 		_ = chromedp.Click("#GotoShoppingCart").Do(ctx)
 		//_ = chromedp.Navigate("https://cart.jd.com/cart_index/").Do(ctx)
-		_ = chromedp.WaitVisible("#cart-body").Do(ctx)
-		_ = chromedp.Click(".common-submit-btn").Do(ctx)
-		//_ = chromedp.WaitVisible("#mainframe").Do(ctx)
 		ch, cc := chromedpEngine.WaitDocumentUpdated(ctx)
-		defer cc()
+		logs.PrintlnInfo("等待购物车页面.....")
+		<-ch
+		cc()
+		info, _ := target.GetTargetInfo().Do(ctx)
+		if strings.Contains(info.URL, "cart.jd.com/cart_index") {
+			logs.PrintlnInfo("Click, common-submit-btn")
+			_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+			_ = chromedp.Click(".common-submit-btn").Do(ctx)
+		} else {
+			logs.PrintlnInfo("Click, submit-btn")
+			_ = chromedp.WaitVisible("container", chromedp.ByID).Do(ctx)
+			_ = chromedp.ScrollIntoView(".submit-btn").Do(ctx);
+			_ = chromedp.Sleep(1 * time.Second).Do(ctx);
+			_ = chromedp.Click(".submit-btn").Do(ctx)
+		}
+
+		//_ = chromedp.WaitVisible("#mainframe").Do(ctx)
+		ch, cc = chromedpEngine.WaitDocumentUpdated(ctx)
 		logs.PrintlnInfo("等待结算页加载完成..... 如遇到未选中商品错误，可手动选中后点击结算")
 		<-ch
+		cc()
 		//执行js参数 将eid和fp显示到对应元素上
 		_ = chromedp.Sleep(3 * time.Second).Do(ctx)
 		res := make(map[string]interface{})
@@ -322,13 +375,15 @@ func (jsk *jdSecKill) GetEidAndFp() chromedp.ActionFunc {
 			logs.PrintlnWarning("获取参数失败，等待重试。。。 重试过程过久可手动刷新浏览器")
 			goto RE
 		}
-		logs.PrintlnInfo("参数获取成功：eid【"+jsk.eid+"】, fp【"+jsk.fp+"】")
+		logs.PrintlnInfo("参数获取成功：eid【" + jsk.eid + "】, fp【" + jsk.fp + "】")
 
 		return nil
 	}
 }
 
 func (jsk *jdSecKill) FetchSecKillUrl() {
+	/*jsk.SecKillUrl = "https://marathon.jd.com/captcha.html?skuId="+jsk.SkuId+"&sn=c3f4ececd8461f0e4d7267e96a91e0e0&from=pc"
+	return*/
 	logs.PrintlnInfo("开始获取抢购连接.....")
 	for {
 		if jsk.SecKillUrl != "" {
@@ -348,21 +403,28 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	if ctx == nil {
 		ctx = jsk.bCtx
 	}
-	//这里直接使用浏览器跳转 主要目的是获取cookie
-	logs.PrintlnInfo("正在访问抢购连接......")
-	_, _, _, _  = page.Navigate(jsk.SecKillUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx)
-	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
+
+	defer func() {
+		if r := recover(); r != nil {
+			logs.PrintErr(r)
+		}
+	}()
+	//这里修改为直接使用http请求访问抢购结算页面 提高速度
+	skUrl := fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix())
 	logs.PrintlnInfo("访问抢购订单结算页面......", skUrl)
-	_, _, _, _ = page.Navigate(skUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx)
+	_, _ = jsk.GetReq(skUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", ctx, true)
+
+	//这里直接使用浏览器跳转 主要目的是获取cookie
+	/*jsk.GetReq(skUrl, nil, "https://item.jd.com/"+jsk.SkuId+".html", ctx)
+	_, _, _, _ = page.Navigate(skUrl).WithReferrer("https://item.jd.com/"+jsk.SkuId+".html").Do(ctx)*/
 
 	logs.PrintlnInfo("获取抢购信息...............")
-	for {
-		err := jsk.GetSecKillInitInfo(ctx)
-		if err != nil {
-			logs.PrintErr("抢购失败：", err, "正在重试.......")
-		}
-		break
+	err := jsk.GetSecKillInitInfo(ctx)
+	if err != nil {
+		logs.PrintErr("抢购失败：", err, "正在重试.......")
+		return err
 	}
+
 	orderData := jsk.GetOrderReqData()
 
 	if len(orderData) == 0 {
@@ -370,9 +432,11 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 	}
 	logs.PrintlnInfo("订单参数：", orderData.Encode())
 	logs.PrintlnInfo("提交抢购订单.............")
-	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, skUrl, ctx)
+
+	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action?skuId="+jsk.SkuId+"", orderData, skUrl, ctx, false)
 	if err != nil {
-		logs.PrintErr("抢购失败：", err)
+		logs.PrintErr("订单提交失败，正在重新提交.....", " errMsg => ", err, " raw => ", r.Raw)
+		return err
 	}
 	orderId := r.Get("orderId").String()
 	if orderId != "" && orderId != "0" {
@@ -380,7 +444,10 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 		jsk.IsOkChan <- struct{}{}
 		logs.PrintlnInfo("抢购成功，订单编号:", r.Get("orderId").String())
 	} else {
-		return errors.New("抢购失败：" + r.Raw)
+		if r.IsObject() || r.IsArray() {
+			return errors.New("抢购失败：" + r.Raw)
+		}
+		return errors.New("抢购失败,再接再厉")
 	}
 	return nil
 }
@@ -407,42 +474,46 @@ func (jsk *jdSecKill) GetOrderReqData() url.Values {
 	}
 	invoiceInfo := jsk.SecKillInfo.Get("invoiceInfo")
 	r := url.Values{
-		"skuId":[]string{jsk.SkuId},
-		"num":[]string{strconv.Itoa(jsk.SecKillNum)},
-		"addressId":[]string{defaultAddress.Get("id").String()},
-		"yuShou":[]string{"true"},
-		"isModifyAddress":[]string{"false"},
-		"name":[]string{defaultAddress.Get("name").String()},
-		"provinceId":[]string{defaultAddress.Get("provinceId").String()},
-		"cityId":[]string{defaultAddress.Get("cityId").String()},
-		"countyId":[]string{defaultAddress.Get("countyId").String()},
-		"townId":[]string{defaultAddress.Get("townId").String()},
-		"addressDetail":[]string{defaultAddress.Get("addressDetail").String()},
-		"mobile":[]string{defaultAddress.Get("mobile").String()},
-		"mobileKey":[]string{defaultAddress.Get("mobileKey").String()},
-		"email":[]string{defaultAddress.Get("email").String()},
-		"postCode":[]string{""},
-		"invoiceTitle":[]string{""},
-		"invoiceCompanyName":[]string{""},
-		"invoiceContent":[]string{},
-		"invoiceTaxpayerNO":[]string{""},
-		"invoiceEmail":[]string{""},
-		"invoicePhone":[]string{invoiceInfo.Get("invoicePhone").String()},
-		"invoicePhoneKey":[]string{invoiceInfo.Get("invoicePhoneKey").String()},
-		"invoice":[]string{"true"},
-		"password":[]string{""},
-		"codTimeType":[]string{"3"},
-		"paymentType":[]string{"4"},
-		"areaCode":[]string{""},
-		"overseas":[]string{"0"},
-		"phone":[]string{""},
-		"eid":[]string{jsk.eid},
-		"fp":[]string{jsk.fp},
-		"token":[]string{jsk.SecKillInfo.Get("token").String()},
-		"pru":[]string{""},
-
+		"skuId":              []string{jsk.SkuId},
+		"num":                []string{strconv.Itoa(jsk.SecKillNum)},
+		"addressId":          []string{defaultAddress.Get("id").String()},
+		"yuShou":             []string{"true"},
+		"isModifyAddress":    []string{"false"},
+		"name":               []string{defaultAddress.Get("name").String()},
+		"provinceId":         []string{defaultAddress.Get("provinceId").String()},
+		"cityId":             []string{defaultAddress.Get("cityId").String()},
+		"countyId":           []string{defaultAddress.Get("countyId").String()},
+		"townId":             []string{defaultAddress.Get("townId").String()},
+		"addressDetail":      []string{defaultAddress.Get("addressDetail").String()},
+		"mobile":             []string{defaultAddress.Get("mobile").String()},
+		"mobileKey":          []string{defaultAddress.Get("mobileKey").String()},
+		"email":              []string{defaultAddress.Get("email").String()},
+		"postCode":           []string{""},
+		"invoiceTitle":       []string{""},
+		"invoiceCompanyName": []string{""},
+		"invoiceContent":     []string{},
+		"invoiceTaxpayerNO":  []string{""},
+		"invoiceEmail":       []string{""},
+		"invoicePhone":       []string{invoiceInfo.Get("invoicePhone").String()},
+		"invoicePhoneKey":    []string{invoiceInfo.Get("invoicePhoneKey").String()},
+		"invoice":            []string{"true"},
+		"password":           []string{""},
+		"codTimeType":        []string{"3"},
+		"paymentType":        []string{"4"},
+		"areaCode":           []string{""},
+		"overseas":           []string{"0"},
+		"phone":              []string{""},
+		"eid":                []string{jsk.eid},
+		"fp":                 []string{jsk.fp},
+		"token":              []string{jsk.SecKillInfo.Get("token").String()},
+		"pru":                []string{""},
 	}
 
+	if invoiceInfo.Raw == "" {
+		r["invoice"] = []string{"false"}
+	} else {
+		r["invoice"] = []string{"true"}
+	}
 	t := invoiceInfo.Get("invoiceTitle").String()
 	if t != "" {
 		r["invoiceTitle"] = []string{t}
@@ -462,10 +533,10 @@ func (jsk *jdSecKill) GetOrderReqData() url.Values {
 
 func (jsk *jdSecKill) GetSecKillInitInfo(ctx context.Context) error {
 	r, err := jsk.PostReq("https://marathon.jd.com/seckillnew/orderService/pc/init.action", url.Values{
-		"sku":[]string{jsk.SkuId},
-		"num":[]string{strconv.Itoa(jsk.SecKillNum)},
-		"isModifyAddress":[]string{"false"},
-	}, fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=100012043978&num=2&rid=%d6", time.Now().Unix()), ctx)
+		"sku":             []string{jsk.SkuId},
+		"num":             []string{strconv.Itoa(jsk.SecKillNum)},
+		"isModifyAddress": []string{"false"},
+	}, fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix()), ctx, false)
 	if err != nil {
 		return err
 	}
@@ -475,14 +546,11 @@ func (jsk *jdSecKill) GetSecKillInitInfo(ctx context.Context) error {
 }
 
 func (jsk *jdSecKill) GetSecKillUrl() string {
-	req, _ := http.NewRequest("GET", "https://itemko.jd.com/itemShowBtn", nil)
-	req.Header.Add("User-Agent", jsk.userAgent)
-	req.Header.Add("Referer", "https://item.jd.com/"+jsk.SkuId+".html")
 	r, _ := jsk.GetReq("https://itemko.jd.com/itemShowBtn", map[string]string{
-		"callback":"jQuery" + strconv.FormatInt(global.GenerateRangeNum(1000000, 9999999), 10),
-		"skuId":jsk.SkuId,
-		"from":"pc",
-		"_": strconv.FormatInt(time.Now().Unix() * 1000, 10),
-	}, "https://item.jd.com/"+jsk.SkuId+".html", nil)
+		"callback": "jQuery" + strconv.FormatInt(global.GenerateRangeNum(1000000, 9999999), 10),
+		"skuId":    jsk.SkuId,
+		"from":     "pc",
+		"_":        strconv.FormatInt(time.Now().Unix()*1000, 10),
+	}, "https://item.jd.com/"+jsk.SkuId+".html", nil, false)
 	return r.Get("url").String()
 }
