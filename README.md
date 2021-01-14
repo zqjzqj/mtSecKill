@@ -44,7 +44,7 @@
   - [google浏览器]
    
 ## 运行参数
- - mtSecKill -sku=100012043978 -num=2 -works=6 -time=09:59:59 运行参数 均有默认可以不加
+ - mtSecKill -sku=100012043978 -num=2 -works=6 -time=09:59:59 -payPwd=xxxx 运行参数 均有默认可以不加
  - 新增eid与fp参数 对于无法自动获取到的用户 请手动填入 默认空 会自动获取
 
 ## 打赏
