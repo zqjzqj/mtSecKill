@@ -19,6 +19,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -134,7 +135,12 @@ func (jsk *jdSecKill) GetReq(reqUrl string, params map[string]string, referer st
 }
 
 func (jsk *jdSecKill) SyncJdTime() {
-	resp, _ := http.Get("https://a.jd.com//ajax/queryServerData.html")
+	resp, err := http.Get("https://a.jd.com/ajax/queryServerData.html")
+	if err != nil {
+		logs.PrintErr(err)
+		os.Exit(0)
+		return
+	}
 	defer resp.Body.Close()
 	b, _ := ioutil.ReadAll(resp.Body)
 	r := gjson.ParseBytes(b)
