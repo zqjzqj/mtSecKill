@@ -536,7 +536,7 @@ func (jsk *jdSecKill) GetSecKillInitInfo(ctx context.Context) error {
 		"sku":             []string{jsk.SkuId},
 		"num":             []string{strconv.Itoa(jsk.SecKillNum)},
 		"isModifyAddress": []string{"false"},
-	}, fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?=skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix()), ctx, false)
+	}, fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?skuId=%s&num=%d&rid=%d", jsk.SkuId, jsk.SecKillNum, time.Now().Unix()), ctx, false)
 	if err != nil {
 		return err
 	}
