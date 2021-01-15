@@ -277,7 +277,7 @@ func (jsk *jdSecKill) Run() error {
 					if err != nil {
 						logs.PrintlnInfo(err, "等待重试")
 						i := rand.Intn(200)
-						time.Sleep( time.Duration(i) * time.Millisecond)
+						time.Sleep(time.Duration(i) * time.Millisecond)
 						goto SecKillRE
 					}
 					_ = chromedp.Navigate("https://order.jd.com/center/list.action").Do(jsk.bCtx)

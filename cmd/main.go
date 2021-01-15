@@ -19,6 +19,7 @@ var brwoserPath = flag.String("execPath", "", "浏览器执行路径，路径不
 var eid = flag.String("eid", "", "如果不传入，可自动获取，对于无法获取的用户可手动传入参数")
 var fp = flag.String("fp", "", "如果不传入，可自动获取，对于无法获取的用户可手动传入参数")
 var payPwd = flag.String("payPwd", "", "支付密码 可不填")
+var isFileLog = flag.Bool("isFileLog", false, "是否使用文件记录日志")
 
 func init() {
 	flag.Parse()
@@ -26,6 +27,11 @@ func init() {
 
 func main() {
 	var err error
+
+	if *isFileLog {
+		logs.AllowFileLogs()
+	}
+
 	execPath := ""
 	if *brwoserPath != "" {
 		execPath = *brwoserPath
