@@ -457,6 +457,7 @@ func (jsk *jdSecKill) ReqSubmitSecKillOrder(ctx context.Context) error {
 		jsk.IsOk = true
 		jsk.IsOkChan <- struct{}{}
 		logs.PrintlnInfo("抢购成功，订单编号:", r.Get("orderId").String())
+		global.NotifyUser("抢购成功，订单编号:", r.Get("orderId").String())
 	} else {
 		if r.IsObject() || r.IsArray() {
 			return errors.New("抢购失败：" + r.Raw)
