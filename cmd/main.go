@@ -22,6 +22,8 @@ var payPwd = flag.String("payPwd", "", "支付密码 可不填")
 var isFileLog = flag.Bool("isFileLog", false, "是否使用文件记录日志")
 
 func init() {
+	flag.StringVar(&global.PushToken, "token", "", "一键推送微信提醒令牌 可不填")
+
 	flag.Parse()
 }
 
