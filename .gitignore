@@ -13,3 +13,5 @@
 
 .idea/
 *.log
+
+output/
